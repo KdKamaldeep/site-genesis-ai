@@ -1,11 +1,11 @@
 import cron from 'node-cron';
 import Tenant from '../models/Tenant.js';
 import Keyword from '../models/Keyword.js';
-import { loadPendingKeywords } from '../generator/keywordLoader.js';
+import Content from '../models/Content.js';
+import { loadPendingKeywords, updateKeywordStatus } from '../generator/keywordLoader.js';
 import { generateContent } from '../generator/contentWriter.js';
-import { assignRelatedLinks } from '../generator/linkManager.js';
-import { buildPage, generateSitemap, generateRobotsTxt, generateIndexPage } from '../generator/pageBuilder.js';
-import { updateKeywordStatus } from '../generator/keywordLoader.js';
+import { assignRelatedLinks, refreshAllInternalLinks } from '../generator/linkManager.js';
+import { buildPage, generateSitemap, generateRobotsTxt, generateIndexPage, generateNginxConfig } from '../generator/pageBuilder.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -45,7 +45,7 @@ const runTenantCron = async (tenantId) => {
         // Generate content and track which AI provider was used
         const result = await generateContent(tenantId, keyword);
         const content = result.content;
-        const aiProvider = result.provider;
+        aiProvider = result.provider;
         
         await assignRelatedLinks(tenantId, keyword.slug, 7);
         await buildPage(tenantId, keyword.slug);
@@ -81,10 +81,24 @@ const runTenantCron = async (tenantId) => {
       }
     }
 
-    // Regenerate sitemap, robots.txt, and index page
+    // Refresh internal links for all content (so new content appears in existing pages)
+    await refreshAllInternalLinks(tenantId, 7);
+    
+    // Rebuild all pages to update internal links
+    const allContent = await Content.find({ tenantId }).select('slug');
+    for (const content of allContent) {
+      try {
+        await buildPage(tenantId, content.slug);
+      } catch (error) {
+        logger.error(`Error rebuilding page for ${content.slug}:`, error);
+      }
+    }
+
+    // Regenerate sitemap, robots.txt, index page, and nginx config
     await generateSitemap(tenantId);
     await generateRobotsTxt(tenantId);
     await generateIndexPage(tenantId);
+    await generateNginxConfig(tenantId);
 
     logger.info(`Cron completed for tenant: ${tenantId}`);
   } catch (error) {

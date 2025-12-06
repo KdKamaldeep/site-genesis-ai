@@ -89,7 +89,7 @@ export const getRelatedLinks = async (tenantId, slug) => {
     return relatedContent.map(c => ({
       slug: c.slug,
       title: c.title,
-      url: `/${c.slug}.html`,
+      url: `/pages/${c.slug}.html`,
     }));
   } catch (error) {
     logger.error('Error getting related links:', error);
@@ -97,9 +97,44 @@ export const getRelatedLinks = async (tenantId, slug) => {
   }
 };
 
+/**
+ * Refresh internal links for all existing content when new content is added
+ * This ensures existing pages can link to newly created content
+ * @param {string} tenantId - Tenant ID
+ * @param {number} count - Number of links to assign per page (default: 7)
+ * @returns {Promise<void>}
+ */
+export const refreshAllInternalLinks = async (tenantId, count = 7) => {
+  try {
+    const allContent = await Content.find({ tenantId }).select('slug');
+    
+    if (allContent.length < 2) {
+      logger.info(`Not enough content to create internal links for tenant ${tenantId}`);
+      return;
+    }
+
+    logger.info(`Refreshing internal links for ${allContent.length} content items in tenant ${tenantId}`);
+
+    // Refresh links for all content
+    for (const content of allContent) {
+      try {
+        await assignRelatedLinks(tenantId, content.slug, count);
+      } catch (error) {
+        logger.error(`Error refreshing links for ${content.slug}:`, error);
+      }
+    }
+
+    logger.info(`Finished refreshing internal links for tenant ${tenantId}`);
+  } catch (error) {
+    logger.error('Error refreshing all internal links:', error);
+    throw error;
+  }
+};
+
 export default {
   getOrCreateLinkDoc,
   assignRelatedLinks,
   getRelatedLinks,
+  refreshAllInternalLinks,
 };
 

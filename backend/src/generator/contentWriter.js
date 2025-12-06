@@ -206,26 +206,29 @@ const buildPrompt = (keyword, type, options, customPrompt = null) => {
       if (!customPrompt || !customPrompt.trim()) {
         throw new Error('Custom prompt is required for pageContent type');
       }
-      // Base prompt ensures JSON structure is returned
-      basePrompt = `Based on the following instructions, create comprehensive page content about "${keyword}".
+      // Base prompt for landing page content - optimized for homepage/landing pages
+      basePrompt = `Create a compelling, conversion-focused landing page about "${keyword}".
+      This should be a complete landing page with engaging sections, clear call-to-actions, and SEO optimization.
       Return a JSON object with:
       {
-        "title": "SEO-friendly title",
-        "content": "Full page content in HTML format with <p>, <h2>, <h3> tags",
+        "title": "Compelling landing page title (SEO-optimized)",
+        "content": "Full landing page content but consice in HTML format with <p>, <h1>, <h2>, <h3>, <section> tags. Include hero section, features/benefits, testimonials, and call-to-action sections.",
         "sections": {
-          "introduction": "Introduction paragraph",
-          "section1": "First main section",
-          "section2": "Second main section",
-          "conclusion": "Conclusion paragraph"
+          "hero": "Hero section with main headline and value proposition",
+          "features": "Key features or benefits section",
+          "benefits": "Benefits or advantages section",
+          "testimonials": "Social proof or testimonials section",
+          "about": "About or additional information section"
         },
         "faq": [
-          {"question": "Question 1", "answer": "Answer 1"},
-          {"question": "Question 2", "answer": "Answer 2"}
+          {"question": "Frequently asked question 1", "answer": "Detailed answer 1"},
+          {"question": "Frequently asked question 2", "answer": "Detailed answer 2"},
+          {"question": "Frequently asked question 3", "answer": "Detailed answer 3"}
         ],
         "meta": {
-          "title": "SEO title (60 chars max)",
-          "description": "Meta description (160 chars max)",
-          "keywords": ["keyword1", "keyword2", "keyword3"]
+          "title": "SEO title for landing page (60 chars max)",
+          "description": "Compelling meta description for landing page (160 chars max)",
+          "keywords": ["keyword1", "keyword2", "keyword3", "keyword4"]
         }
       }`;
       // For pageContent, custom prompt comes first, then base prompt

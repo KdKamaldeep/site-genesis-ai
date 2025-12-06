@@ -256,7 +256,7 @@ export const generateIndexPage = async (tenantId) => {
     const navigationLinks = allContent.map(c => ({
       slug: c.slug,
       title: c.title,
-      url: `/${c.slug}.html`,
+      url: `/pages/${c.slug}.html`,
     }));
 
     // Prepare template data
@@ -289,10 +289,101 @@ export const generateIndexPage = async (tenantId) => {
   }
 };
 
+/**
+ * Generate nginx.conf for a tenant
+ * @param {string} tenantId - Tenant ID
+ * @returns {Promise<string>} - Generated nginx.conf file path
+ */
+export const generateNginxConfig = async (tenantId) => {
+  try {
+    const tenant = await Tenant.findById(tenantId);
+    if (!tenant) {
+      throw new Error(`Tenant not found: ${tenantId}`);
+    }
+
+    const nginxConfig = `# Nginx configuration for ${tenant.name} (${tenant.domain})
+# Generated automatically - do not edit manually
+# 
+# To use this configuration:
+# 1. Copy this file to /etc/nginx/sites-available/${tenant.domain}
+# 2. Update the 'root' directive with the actual path to the tenant's public directory
+# 3. Create symlink: ln -s /etc/nginx/sites-available/${tenant.domain} /etc/nginx/sites-enabled/
+# 4. Test: nginx -t
+# 5. Reload: systemctl reload nginx
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${tenant.domain} www.${tenant.domain};
+
+    # Public root of your tenant
+    root /;
+
+    # Default index inside /pages
+    index /pages/index.html;
+
+    # Logging
+    access_log /var/log/nginx/${tenantId}-access.log;
+    error_log /var/log/nginx/${tenantId}-error.log;
+
+    # Serve homepage
+    location = / {
+        try_files /pages/index.html =404;
+    }
+
+    # Serve any page as /slug → /pages/slug.html
+    location / {
+        try_files $uri $uri/ /pages/$uri.html =404;
+    }
+
+    # Static assets (css, js, images)
+    location ~* \\.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    # robots.txt at root
+    location = /robots.txt {
+        try_files /robots.txt =404;
+        add_header Content-Type "text/plain";
+    }
+
+    # sitemap.xml at root
+    location = /sitemap.xml {
+        try_files /sitemap.xml =404;
+        add_header Content-Type "application/xml";
+    }
+
+    # Prevent access to hidden files
+    location ~ /\\. {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+}
+`;
+
+    // Save nginx config file in tenant's public directory (same location as sitemap.xml)
+    const publicDir = join(config.tenantsDir, tenantId, 'public');
+    await fs.mkdir(publicDir, { recursive: true });
+    
+    const nginxConfigPath = join(publicDir, 'nginx.conf');
+    await fs.writeFile(nginxConfigPath, nginxConfig, 'utf-8');
+
+    logger.info(`Nginx config generated: ${nginxConfigPath}`);
+    return nginxConfigPath;
+  } catch (error) {
+    logger.error('Error generating nginx config:', error);
+    throw error;
+  }
+};
+
 export default {
   buildPage,
   generateSitemap,
   generateRobotsTxt,
   generateIndexPage,
+  generateNginxConfig,
 };
 

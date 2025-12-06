@@ -8,7 +8,7 @@ const contentSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['essay', 'speech', 'tenLines'],
+    enum: ['essay', 'speech', 'tenLines', 'pageContent'],
     required: true,
   },
   slug: {

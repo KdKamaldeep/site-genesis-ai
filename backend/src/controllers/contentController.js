@@ -1,7 +1,7 @@
 import Content from '../models/Content.js';
 import { generateContent } from '../generator/contentWriter.js';
-import { buildPage, generateSitemap, generateRobotsTxt, generateIndexPage } from '../generator/pageBuilder.js';
-import { assignRelatedLinks } from '../generator/linkManager.js';
+import { buildPage, generateSitemap, generateRobotsTxt, generateIndexPage, generateNginxConfig } from '../generator/pageBuilder.js';
+import { assignRelatedLinks, refreshAllInternalLinks } from '../generator/linkManager.js';
 import { loadPendingKeywords, updateKeywordStatus } from '../generator/keywordLoader.js';
 import Keyword from '../models/Keyword.js';
 import logger from '../utils/logger.js';
@@ -128,10 +128,24 @@ export const generateContentForTenant = async (req, res) => {
       }
     }
 
-    // Regenerate sitemap, robots.txt, and index page
+    // Refresh internal links for all content (so new content appears in existing pages)
+    await refreshAllInternalLinks(tenantId, 7);
+    
+    // Rebuild all pages to update internal links
+    const allContent = await Content.find({ tenantId }).select('slug');
+    for (const content of allContent) {
+      try {
+        await buildPage(tenantId, content.slug);
+      } catch (error) {
+        logger.error(`Error rebuilding page for ${content.slug}:`, error);
+      }
+    }
+
+    // Regenerate sitemap, robots.txt, index page, and nginx config
     await generateSitemap(tenantId);
     await generateRobotsTxt(tenantId);
     await generateIndexPage(tenantId);
+    await generateNginxConfig(tenantId);
 
     logger.info(`Generated ${results.filter(r => r.status === 'success').length} content items for tenant ${tenantId}`);
     res.json({
@@ -212,9 +226,12 @@ export const regenerateContent = async (req, res) => {
       updatedAt: new Date(),
     });
     
-    // Rebuild page and index
+    // Rebuild page, index, sitemap, robots.txt, and nginx config
     await buildPage(content.tenantId, content.slug);
+    await generateSitemap(content.tenantId);
+    await generateRobotsTxt(content.tenantId);
     await generateIndexPage(content.tenantId);
+    await generateNginxConfig(content.tenantId);
 
     logger.info(`Content regenerated: ${req.params.id} using ${aiProvider}`);
     res.json(newContent);

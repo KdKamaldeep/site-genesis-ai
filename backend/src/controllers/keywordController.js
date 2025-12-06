@@ -4,7 +4,9 @@ import { slugify } from '../utils/slugify.js';
 import logger from '../utils/logger.js';
 import { generateContent } from '../generator/contentWriter.js';
 import { assignRelatedLinks } from '../generator/linkManager.js';
-import { buildPage } from '../generator/pageBuilder.js';
+import { buildPage, generateSitemap, generateRobotsTxt, generateIndexPage, generateNginxConfig } from '../generator/pageBuilder.js';
+import Content from '../models/Content.js';
+import { refreshAllInternalLinks } from '../generator/linkManager.js';
 
 export const createKeyword = async (req, res) => {
   try {
@@ -267,6 +269,25 @@ export const retryKeyword = async (req, res) => {
 
       // Build HTML page
       await buildPage(keyword.tenantId, keyword.slug);
+
+      // Refresh internal links for all content (so new content appears in existing pages)
+      await refreshAllInternalLinks(keyword.tenantId, 7);
+      
+      // Rebuild all pages to update internal links
+      const allContent = await Content.find({ tenantId: keyword.tenantId }).select('slug');
+      for (const content of allContent) {
+        try {
+          await buildPage(keyword.tenantId, content.slug);
+        } catch (error) {
+          logger.error(`Error rebuilding page for ${content.slug}:`, error);
+        }
+      }
+
+      // Regenerate sitemap, robots.txt, index page, and nginx config
+      await generateSitemap(keyword.tenantId);
+      await generateRobotsTxt(keyword.tenantId);
+      await generateIndexPage(keyword.tenantId);
+      await generateNginxConfig(keyword.tenantId);
 
       // Mark as completed
       keyword.status = 'completed';

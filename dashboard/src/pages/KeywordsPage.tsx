@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { KeyRound, Filter, CheckCircle, Clock, XCircle, Loader, RotateCw, Edit } from 'lucide-react'
+import { KeyRound, Filter, CheckCircle, Clock, XCircle, Loader, RotateCw, Edit, Trash2 } from 'lucide-react'
 // @ts-ignore - papaparse doesn't have types
 import Papa from 'papaparse'
 import type { Keyword, Tenant } from '@/types'
@@ -43,6 +43,7 @@ export default function KeywordsPage() {
   })
   const [bulkKeywords, setBulkKeywords] = useState<string>('')
   const [retryingKeywords, setRetryingKeywords] = useState<Set<string>>(new Set())
+  const [deletingKeywords, setDeletingKeywords] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     loadTenants()
@@ -184,6 +185,30 @@ export default function KeywordsPage() {
       loadKeywords()
     } catch (error: any) {
       alert(error.response?.data?.error || 'Failed to update keyword')
+    }
+  }
+
+  const handleDelete = async (keywordId: string, keywordText: string): Promise<void> => {
+    if (deletingKeywords.has(keywordId)) return
+    
+    if (!confirm(`Are you sure you want to delete the keyword "${keywordText}"? This action cannot be undone.`)) {
+      return
+    }
+    
+    try {
+      setDeletingKeywords(prev => new Set(prev).add(keywordId))
+      await keywordAPI.delete(keywordId)
+      alert('Keyword deleted successfully')
+      await loadKeywords() // Reload keywords to reflect deletion
+    } catch (error: any) {
+      console.error('Error deleting keyword:', error)
+      alert(error.response?.data?.error || error.message || 'Failed to delete keyword')
+    } finally {
+      setDeletingKeywords(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(keywordId)
+        return newSet
+      })
     }
   }
 
@@ -382,6 +407,25 @@ export default function KeywordsPage() {
                               <>
                                 <RotateCw className="w-3 h-3 mr-1" />
                                 Retry
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelete(keyword._id, keyword.keyword)}
+                            disabled={deletingKeywords.has(keyword._id)}
+                            className="h-8 px-3 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            {deletingKeywords.has(keyword._id) ? (
+                              <>
+                                <Loader className="w-3 h-3 mr-1 animate-spin" />
+                                Deleting...
+                              </>
+                            ) : (
+                              <>
+                                <Trash2 className="w-3 h-3 mr-1" />
+                                Delete
                               </>
                             )}
                           </Button>
