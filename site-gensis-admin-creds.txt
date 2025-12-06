@@ -1,0 +1,10 @@
+Admin user created successfully!
+Email: admin@sitegenesis.com
+Password: admin123
+Role: admin
+
+
+open ai key : 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
+
+
+gemini api key : AIzaSyCcYpf5dE2xyWDeXMD81sV5by7lMRFPXaQ
